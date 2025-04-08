@@ -1,152 +1,155 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
-<ScrollView android:layout_width="match_parent"
+<ScrollView
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
     xmlns:android="http://schemas.android.com/apk/res/android">
-    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <EditText
-        android:id="@+id/et_input"
-        android:layout_width="379dp"
-        android:layout_height="73dp"
-        android:layout_weight="1"
-        android:gravity="top"
-        android:hint="输入要发送的内容"
-        android:inputType="textMultiLine"
-        android:minLines="3" />
-    <Button
-        android:id="@+id/btn_send"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="发送" />
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <TextView
-        android:id="@+id/tv_speed"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:lineSpacingExtra="4dp"
-        android:padding="8dp"
-        android:textSize="16sp" />
+        <EditText
+            android:id="@+id/et_input"
+            android:layout_width="379dp"
+            android:layout_height="73dp"
+            android:layout_weight="1"
+            android:gravity="top"
+            android:hint="输入要发送的内容"
+            android:inputType="textMultiLine"
+            android:minLines="3" />
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="141dp"
-        android:background="#f5f5f5">
+        <Button
+            android:id="@+id/btn_send"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="测试" />
+
+        <!-- 新增单次发送按钮 -->
+        <Button
+            android:id="@+id/btn_send_once"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="单次发送"
+            android:layout_marginTop="8dp" />
 
         <TextView
-            android:id="@+id/tv_received"
+            android:id="@+id/tv_speed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:lineSpacingExtra="4dp"
             android:padding="8dp"
             android:textSize="16sp" />
-    </ScrollView>
 
-    <!-- 发送固定图片按钮 -->
-    <Button
-        android:id="@+id/btn_send_image"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="发送图片"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="141dp"
+            android:background="#f5f5f5">
 
-    <!-- 显示发送进度 -->
-    <TextView
-        android:id="@+id/tv_progress"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+            <TextView
+                android:id="@+id/tv_received"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="4dp"
+                android:padding="8dp"
+                android:textSize="16sp" />
+        </ScrollView>
 
-    <!-- 接收图片显示区域 -->
-    <ImageView
-        android:id="@+id/iv_received_image"
-        android:layout_width="300dp"
-        android:layout_height="300dp"
-        android:scaleType="fitCenter"
-        android:background="#EEE"
-        android:contentDescription="接收到的图片预览"/>
-
-    <Button
-        android:id="@+id/btn_send_audio"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="发送音频"
-        android:layout_marginTop="16dp"/>
-
-    <!-- 音频发送进度 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="8dp">
-
-        <TextView
+        <!-- 发送固定图片按钮 -->
+        <Button
+            android:id="@+id/btn_send_image"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="音频发送进度:"/>
+            android:text="发送图片"/>
 
-        <ProgressBar
-            android:id="@+id/progress_audio_send"
-            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        <!-- 显示发送进度 -->
+        <TextView
+            android:id="@+id/tv_progress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
 
-        <TextView
-            android:id="@+id/tv_audio_send_status"
+        <!-- 接收图片显示区域 -->
+        <ImageView
+            android:id="@+id/iv_received_image"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:scaleType="fitCenter"
+            android:background="#EEE"
+            android:contentDescription="接收到的图片预览"/>
+
+        <Button
+            android:id="@+id/btn_send_audio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="等待发送..."/>
-    </LinearLayout>
+            android:text="发送音频"
+            android:layout_marginTop="16dp"/>
 
-
-
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="音频接收状态:"/>
-
-        <ProgressBar
-            android:id="@+id/progress_audio_receive"
-            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        <!-- 音频发送进度 -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="8dp"/>
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp">
 
-        <TextView
-            android:id="@+id/tv_audio_status"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="音频发送进度:"/>
+
+            <ProgressBar
+                android:id="@+id/progress_audio_send"
+                style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/tv_audio_send_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="等待发送..."/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="音频接收状态:"/>
+
+            <ProgressBar
+                android:id="@+id/progress_audio_receive"
+                style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"/>
+
+            <TextView
+                android:id="@+id/tv_audio_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="等待音频数据..."
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_play"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="等待音频数据..."
-            android:layout_marginTop="4dp"/>
-    </LinearLayout>
+            android:text="播放"
+            android:layout_marginTop="8dp"
+            android:enabled="false"/>
 
-    <Button
-        android:id="@+id/btn_play"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="播放"
-        android:layout_marginTop="8dp"
-        android:enabled="false"/>
-
-
-
-    <TextView
-        android:id="@+id/tv_device_info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="设备信息"
-        android:textSize="18sp" />
+        <TextView
+            android:id="@+id/tv_device_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:text="设备信息"
+            android:textSize="18sp" />
 
     </LinearLayout>
 </ScrollView>

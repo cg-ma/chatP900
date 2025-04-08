@@ -17,6 +17,8 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -43,42 +45,35 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
-
 public class MainActivity extends AppCompatActivity {
     private static final String ACTION_USB_PERMISSION = "com.example.USB_PERMISSION";
     private UsbManager usbManager;
     private UsbSerialPort serialPort;
     private TextView tvReceived;
-
     private TextView tvDeviceInfo;
-    private Button btnSend;
+    private Button btnSend;        // 定时发送按钮
+    private Button btnSendOnce;    // 单次发送按钮
     private Button btnSendImage;
-
     private TextView tvProgress;
     private byte[] fixedImageBytes;
     private EditText etInput;
     private TextView tvSpeed;
-
-    private ImageView ivReceivedImage;  // 图片显示控件
+    private ImageView ivReceivedImage;
     private ByteArrayOutputStream imageBuffer = new ByteArrayOutputStream();
     private boolean isReceivingImage = false;
     private int expectedImageSize = 0;
-
     private static final String LINE_BREAK = "\n";
     private StringBuilder receivedText = new StringBuilder();
     private byte[] audioData;
-
     private MediaPlayer mediaPlayer;
     private Button btnPlay;
     private ProgressBar progressAudioReceive;
     private TextView tvAudioStatus;
     private byte[] receivedAudioData;
-
     private ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
     private int expectedAudioSize = 0;
     private boolean isReceivingAudio = false;
     private Button btnSendAudio;
-
     private ProgressBar progressAudioSend;
     private TextView tvAudioSendStatus;
 
@@ -86,6 +81,10 @@ public class MainActivity extends AppCompatActivity {
     private static final byte IMAGE_FLAG = 0x32;
     private static final byte AUDIO_FLAG = 0x33;
     private static final byte IMAGE_FLAG_END = 0x34;
+
+    private Handler sendHandler = new Handler(Looper.getMainLooper());
+    private Runnable sendRunnable;
+    private int sendCount = 0;
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -98,24 +97,17 @@ public class MainActivity extends AppCompatActivity {
         tvReceived = findViewById(R.id.tv_received);
         tvDeviceInfo = findViewById(R.id.tv_device_info);
         btnSendImage = findViewById(R.id.btn_send_image);
-        // 发送文字
         btnSend = findViewById(R.id.btn_send);
-        // 新增进度显示控件
+        btnSendOnce = findViewById(R.id.btn_send_once);
         tvProgress = findViewById(R.id.tv_progress);
-
         ivReceivedImage = findViewById(R.id.iv_received_image);
-
         etInput = findViewById(R.id.et_input);
-        // 发送音频
         btnSendAudio = findViewById(R.id.btn_send_audio);
-
         progressAudioReceive = findViewById(R.id.progress_audio_receive);
         tvAudioStatus = findViewById(R.id.tv_audio_status);
         btnPlay = findViewById(R.id.btn_play);
-        // 发送音频
         progressAudioSend = findViewById(R.id.progress_audio_send);
         tvAudioSendStatus = findViewById(R.id.tv_audio_send_status);
-
         tvSpeed = findViewById(R.id.tv_speed);
 
         // 加载固定图片到内存
@@ -128,28 +120,51 @@ public class MainActivity extends AppCompatActivity {
 
         btnPlay.setOnClickListener(v -> playAudio());
 
-//        btnSend.setOnClickListener(v -> sendData("hello"));
-
-        // 发送文字
+        // 定时发送按钮逻辑（持续发送 "1"）
         btnSend.setOnClickListener(v -> {
-            // 获取输入内容并去除首尾空格
-            String inputText = etInput.getText().toString().trim();
+            if (sendRunnable != null) {
+                sendHandler.removeCallbacks(sendRunnable);
+                sendRunnable = null;
+                Toast.makeText(this, "已停止发送", Toast.LENGTH_SHORT).show();
+                btnSend.setText("发送");
+            } else {
+                sendCount = 0;
+                receivedText.setLength(0); // 可选：清空文本框
+                tvReceived.setText("");    // 可选：清空显示
 
-            // 检查输入是否为空
-//            if (inputText.isEmpty()) {
-//                Toast.makeText(this, "输入不能为空", Toast.LENGTH_SHORT).show();
-//                return;
-//            }
-
-            // 发送动态内容
-//            sendTextData(inputText);
-
-            while (true){
-                sendTextData(inputText);
+                sendRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        sendTextData("1"); // 定时发送 "1"
+                        sendCount++;
+                        runOnUiThread(() -> {
+                            receivedText.append("发送次数: ").append(sendCount).append(LINE_BREAK);
+                            tvReceived.setText(receivedText.toString());
+                            ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
+                        });
+                        sendHandler.postDelayed(this, 100);
+                    }
+                };
+                sendHandler.post(sendRunnable);
+                Toast.makeText(this, "开始定时发送", Toast.LENGTH_SHORT).show();
+                btnSend.setText("停止");
             }
+        });
 
-            // 清空输入框（可选）
-//            etInput.setText("");
+        // 单次发送按钮逻辑（发送文本框内容）
+        btnSendOnce.setOnClickListener(v -> {
+            String inputText = etInput.getText().toString().trim();
+            if (!inputText.isEmpty()) {
+                sendTextData(inputText); // 单次发送文本框内容
+                runOnUiThread(() -> {
+                    receivedText.append("单次发送: ").append(inputText).append(LINE_BREAK);
+                    tvReceived.setText(receivedText.toString());
+                    ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
+                });
+                Toast.makeText(this, "已发送一次", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "请输入内容后再发送", Toast.LENGTH_SHORT).show();
+            }
         });
 
         // 发送图片
@@ -163,18 +178,12 @@ public class MainActivity extends AppCompatActivity {
 
         // 发送音频
         btnSendAudio.setOnClickListener(v -> {
-            // 1. 发送开始时更新状态
             runOnUiThread(() -> {
                 tvAudioSendStatus.setText("发送中...");
                 progressAudioSend.setProgress(0);
             });
-
-            // 2. 启动发送线程
-            new Thread(() -> {
-                sendAudioData(); // 内部需分片更新进度
-            }).start();
+            new Thread(() -> sendAudioData()).start();
         });
-
 
         // 注册广播接收器
         IntentFilter filter = new IntentFilter();
@@ -184,21 +193,17 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(usbReceiver, filter);
     }
 
-    // 从assets加载固定图片
     private void loadFixedImage() {
         try {
             InputStream is = getAssets().open("test30kB.jpg");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-
             byte[] data = new byte[1024];
             int nRead;
             while ((nRead = is.read(data, 0, data.length)) != -1) {
                 buffer.write(data, 0, nRead);
             }
-
             fixedImageBytes = buffer.toByteArray();
             tvProgress.setText("图片已加载，大小: " + fixedImageBytes.length + "字节");
-
             buffer.close();
         } catch (IOException e) {
             Log.e("USB", "加载图片失败", e);
@@ -206,7 +211,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // 图片发送
     private void sendImageData(byte[] imageData) {
         if (serialPort == null) {
             Toast.makeText(this, "USB设备未连接", Toast.LENGTH_SHORT).show();
@@ -215,67 +219,47 @@ public class MainActivity extends AppCompatActivity {
 
         new Thread(() -> {
             try {
-                // 双重检查serialPort状态
                 if (serialPort == null || !serialPort.isOpen()) {
                     runOnUiThread(() ->
                             Toast.makeText(this, "USB未连接", Toast.LENGTH_SHORT).show());
                     return;
                 }
-
-                // 检查图片数据有效性
                 if (imageData == null || imageData.length == 0) {
                     runOnUiThread(() ->
                             Toast.makeText(this, "图片数据无效", Toast.LENGTH_SHORT).show());
                     return;
                 }
 
-                // 发送图片大小信息（4字节）
-//                byte[] sizeInfo = ByteBuffer.allocate(4).putInt(imageData.length).array();
                 byte[] sizeInfo = ByteBuffer.allocate(5)
-                        .put(IMAGE_FLAG)          // 1字节标记位
-                        .putInt(imageData.length) // 4字节图片大小
+                        .put(IMAGE_FLAG)
+                        .putInt(imageData.length)
                         .array();
                 serialPort.write(sizeInfo, 1000);
 
-                // 分片发送图片数据
-                int chunkSize = 63;  // 每包512字节
-                int totalPackets = (int) Math.ceil((double)imageData.length / chunkSize);
+                int chunkSize = 63;
+                int totalPackets = (int) Math.ceil((double) imageData.length / chunkSize);
 
                 for (int i = 0; i < totalPackets; i++) {
                     sleep(3000);
-
                     int start = i * chunkSize;
                     int end = Math.min(start + chunkSize, imageData.length);
                     byte[] chunk = Arrays.copyOfRange(imageData, start, end);
 
-                    if (chunk.length == 0) {
-                        continue;
-                    }
+                    if (chunk.length == 0) continue;
 
                     byte[] packet = new byte[chunk.length + 1];
-                    packet[0] = IMAGE_FLAG;
-                    if(i == totalPackets-1){
-                        packet[0] = IMAGE_FLAG_END;
-                    }
-
+                    packet[0] = (i == totalPackets - 1) ? IMAGE_FLAG_END : IMAGE_FLAG;
                     System.arraycopy(chunk, 0, packet, 1, chunk.length);
                     serialPort.write(packet, 1000);
 
-//                    serialPort.write(chunk, 1000);
-
-                    // 更新进度
                     final int progress = (i + 1) * 100 / totalPackets;
                     runOnUiThread(() -> tvProgress.setText("发送进度: " + progress + "%"));
                 }
 
-                runOnUiThread(() -> Toast.makeText(MainActivity.this,
-                        "图片发送完成", Toast.LENGTH_SHORT).show());
-
-            } catch (IOException e) {
+                runOnUiThread(() -> Toast.makeText(this, "图片发送完成", Toast.LENGTH_SHORT).show());
+            } catch (IOException | InterruptedException e) {
                 Log.e("USB", "图片发送失败", e);
                 runOnUiThread(() -> tvProgress.setText("发送失败: " + e.getMessage()));
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
         }).start();
     }
@@ -287,17 +271,15 @@ public class MainActivity extends AppCompatActivity {
             if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                 UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (device != null) {
-                    // 更新界面，显示设备信息
-                    String deviceInfo = "设备插入: " + "VendorId=" + device.getVendorId() +
+                    String deviceInfo = "设备插入: VendorId=" + device.getVendorId() +
                             ", ProductId=" + device.getProductId();
                     tvDeviceInfo.setText(deviceInfo);
                     Log.d("USB", "设备插入: " + deviceInfo);
-                    requestUsbPermission(device); // 请求权限
+                    requestUsbPermission(device);
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (device != null) {
-                    // 更新界面，显示设备拔出信息
                     tvDeviceInfo.setText("设备已拔出");
                     Log.d("USB", "设备拔出");
                 }
@@ -347,10 +329,8 @@ public class MainActivity extends AppCompatActivity {
     private void sendTextData(String data) {
         if (serialPort != null) {
             try {
-//                serialPort.write(data.getBytes(StandardCharsets.UTF_8), 1000);
-
                 byte[] textBytes = data.getBytes(StandardCharsets.UTF_8);
-                Arrays.fill(textBytes, (byte) 0x41);
+                // 对于单次发送，使用原始文本内容；对于定时发送，已在调用时固定为 "1"
                 byte[] packet = new byte[textBytes.length + 1];
                 packet[0] = TEXT_FLAG;
                 System.arraycopy(textBytes, 0, packet, 1, textBytes.length);
@@ -368,133 +348,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-//    private void startReading() {
-//        new Thread(() -> {
-//            byte[] buffer = new byte[64];
-//            while (true) {
-//                try {
-//                    int len = serialPort.read(buffer, 1000);
-//                    if (len > 0) {
-//                        String receivedData = new String(buffer, 0, len);
-//                        runOnUiThread(() -> tvReceived.setText("接收到: " + receivedData));
-//                        Log.d("USB", "接收到数据: " + receivedData);
-//                    }
-//                } catch (IOException e) {
-//                    Log.e("USB", "读取失败", e);
-//                    break;
-//                }
-//            }
-//        }).start();
-//    }
-
     private void startReading() {
-//        // 音频
-//        new Thread(() -> {
-//            byte[] buffer = new byte[1024]; // 接收缓冲区
-//            while (!Thread.currentThread().isInterrupted()) {
-//                try {
-//                    // 从串口读取数据
-//                    int len = serialPort.read(buffer, 1000); // 超时1秒
-//                    if (len > 0) {
-//                        // 关键调用点：将收到的字节交给处理器
-//                        processReceivedDataAudio(buffer, len);
-//                    }
-//                } catch (IOException e) {
-//                    Log.e("USB", "接收中断", e);
-//                    break;
-//                }
-//            }
-//        }).start();
-//
-//        // 图片
-//        new Thread(() -> {
-//            byte[] buffer = new byte[1024];
-//            while (!Thread.currentThread().isInterrupted()) {
-//                try {
-//                    int len = serialPort.read(buffer, 1000);
-//                    if (len > 0) {
-//                        processReceivedDataImage(buffer, len);
-//                    }
-//                } catch (IOException e) {
-//                    Log.e("USB", "接收中断", e);
-//                    break;
-//                }
-//            }
-//        }).start();
-//
-////        // 文字 单行
-////        new Thread(() -> {
-////            byte[] buffer = new byte[64];
-////            while (true) {
-////                try {
-////                    int len = serialPort.read(buffer, 1000);
-////                    if (len > 0) {
-////                        String receivedData = new String(buffer, 0, len);
-////                        runOnUiThread(() -> tvReceived.setText("接收到: " + receivedData));
-////                        Log.d("USB", "接收到数据: " + receivedData);
-////                    }
-////                } catch (IOException e) {
-////                    Log.e("USB", "读取失败", e);
-////                    break;
-////                }
-////            }
-////        }).start();
-//
-//        // 文字 多行
-//        new Thread(() -> {
-//            byte[] buffer = new byte[1024];
-//            while (!Thread.currentThread().isInterrupted()) {
-//                try {
-//                    int len = serialPort.read(buffer, 1000);
-//                    if (len > 0) {
-//                        String newData = new String(buffer, 0, len, StandardCharsets.UTF_8);
-//                        appendReceivedData(newData); // 追加新数据
-//                    }
-//                } catch (IOException e) {
-//                    Log.e("USB", "接收中断", e);
-//                    break;
-//                }
-//            }
-//        }).start();
-
-
         new Thread(() -> {
             byte[] buffer = new byte[1024];
-            byte[] dataTemp = new byte[64];
-            boolean flag64 = false;
-            int dataLenTemp = 0;
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     int len = serialPort.read(buffer, 1000);
                     if (len > 1) {
                         byte flag = buffer[0];
                         byte[] data = Arrays.copyOfRange(buffer, 1, len);
-//                        String newData = new String(buffer, 1, len - 1, StandardCharsets.UTF_8);
-
-//                        if((len == 5 && flag == IMAGE_FLAG)||flag == IMAGE_FLAG_END){
-//                            processReceivedDataImage(data, len-1);
-//                            continue;
-//                        }
-//
-//                        if(data.length < 63 && !flag64){
-//                            System.arraycopy(data, 0, dataTemp, 0, data.length);
-//                            flag64 = true;
-//                            dataLenTemp = data.length;
-//                            continue;
-//                        }
-//
-//                        if(data.length < 63 && flag64){
-//                            System.arraycopy(data, 0, dataTemp, dataLenTemp, data.length);
-//                            flag64 = false;
-//                            data = dataTemp;
-//                        }
-
                         if (flag == TEXT_FLAG) {
-                            processReceiveDataText(data); // 处理文本数据
-                        } else if(flag == IMAGE_FLAG){
-                            processReceivedDataImage(data, len-1);
-                        }else {
-                            processReceivedDataAudio(data, len-1);
+                            processReceiveDataText(data);
+                        } else if (flag == IMAGE_FLAG) {
+                            processReceivedDataImage(data, len - 1);
+                        } else {
+                            processReceivedDataAudio(data, len - 1);
                         }
                     }
                 } catch (IOException e) {
@@ -505,22 +373,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-//    private void processReceiveDataText(byte[] receivedBytes) {
-//        try {
-//            String text = new String(receivedBytes, StandardCharsets.UTF_8);
-//
-//            runOnUiThread(() -> {
-//                receivedText.append(text).append(LINE_BREAK);
-//                tvReceived.setText(receivedText.toString());
-//                // 滚动到底部
-//                ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
-//            });
-//        } catch (Exception e) {
-//            Log.e("USB", "解码失败", e);
-//        }
-//    }
-
-    // 成员变量
     private long lastReceiveTime = 0;
     private double currentSpeed = 0;
     private double[] speedHistory = new double[5];
@@ -534,8 +386,6 @@ public class MainActivity extends AppCompatActivity {
             if (lastReceiveTime > 0) {
                 double intervalSec = (currentTime - lastReceiveTime) / 1000.0;
                 currentSpeed = currentByteCount / intervalSec / 1024;
-
-                // 平滑处理
                 speedHistory[speedIndex % 5] = currentSpeed;
                 speedIndex++;
                 currentSpeed = Arrays.stream(speedHistory).average().orElse(0);
@@ -550,7 +400,6 @@ public class MainActivity extends AppCompatActivity {
                 tvReceived.setText(receivedText.toString());
                 ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
             });
-
         } catch (Exception e) {
             Log.e("USB", "解码失败", e);
         }
@@ -567,34 +416,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void processReceivedDataImage(byte[] chunk, int length) {
-        // 协议：前4字节是图片大小（大端序）
         if (!isReceivingImage && length >= 4) {
             expectedImageSize = ByteBuffer.wrap(chunk, 0, 4).getInt();
-            imageBuffer.write(chunk, 4, length - 4);  // 写入剩余数据
+            imageBuffer.write(chunk, 4, length - 4);
             isReceivingImage = true;
             Log.d("USB", "开始接收图片，预期大小: " + expectedImageSize);
             return;
         }
 
-
-        // 正在接收图片数据
         if (isReceivingImage) {
-//            long timeStart = System.currentTimeMillis();
-            final int[] imageBufferAgo = {0};
-
             imageBuffer.write(chunk, 0, length);
-
-            // 更新进度
             runOnUiThread(() -> {
                 int progress = (int) (imageBuffer.size() * 100.0 / expectedImageSize);
-//                long timeStop = System.currentTimeMillis();
-//                int speed = (int) ((imageBuffer.size()- imageBufferAgo[0])/(timeStop - timeStart));
-//                tvProgress.setText("接收进度: " + progress + "%   " + speed + "kbps");
-                tvProgress.setText("接收进度: " + progress + "%   ");
-                imageBufferAgo[0] = imageBuffer.size();
+                tvProgress.setText("接收进度: " + progress + "%");
             });
 
-            // 接收完成
             if (imageBuffer.size() >= expectedImageSize) {
                 showReceivedImage(imageBuffer.toByteArray());
                 imageBuffer.reset();
@@ -637,39 +473,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendAudioData() {
-        //loadAudioFile();
         try {
-            // 1. 初始化进度
             runOnUiThread(() -> {
                 progressAudioSend.setMax(audioData.length);
                 tvAudioSendStatus.setText("开始发送...");
             });
 
-            // 2. 发送文件头
-//            byte[] header = ByteBuffer.allocate(4).putInt(audioData.length).array();
-//            byte[] header = ByteBuffer.allocate(5).putInt(AUDIO_FLAG+audioData.length).array();
-//            serialPort.write(header, 1000);
-
             byte[] header = ByteBuffer.allocate(5)
-                    .put(AUDIO_FLAG)          // 1字节标记位
-                    .putInt(audioData.length) // 4字节图片大小
+                    .put(AUDIO_FLAG)
+                    .putInt(audioData.length)
                     .array();
             serialPort.write(header, 1000);
 
-            // 3. 分片发送
             int chunkSize = 512;
             for (int i = 0; i < audioData.length; i += chunkSize) {
                 byte[] chunk = Arrays.copyOfRange(audioData, i, Math.min(i + chunkSize, audioData.length));
-
                 byte[] packet = new byte[chunk.length + 1];
                 packet[0] = AUDIO_FLAG;
                 System.arraycopy(chunk, 0, packet, 1, chunk.length);
                 serialPort.write(packet, 1000);
 
-//                serialPort.write(chunk, 1000);
-
-                // 4. 实时更新进度（限制刷新频率）
-                if (i % (chunkSize * 5) == 0) { // 每发送5个块更新一次UI
+                if (i % (chunkSize * 5) == 0) {
                     final int progress = i;
                     runOnUiThread(() -> {
                         progressAudioSend.setProgress(progress);
@@ -678,12 +502,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            // 5. 最终完成状态
             runOnUiThread(() -> {
                 progressAudioSend.setProgress(audioData.length);
                 tvAudioSendStatus.setText("发送完成");
             });
-
         } catch (IOException e) {
             runOnUiThread(() -> tvAudioSendStatus.setText("发送错误: " + e.getMessage()));
         }
@@ -691,7 +513,6 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("DefaultLocale")
     private void processReceivedDataAudio(byte[] data, int length) {
-        // 音频协议：前4字节是文件大小
         if (!isReceivingAudio && length >= 4) {
             expectedAudioSize = ByteBuffer.wrap(data, 0, 4).getInt();
             audioBuffer.write(data, 4, length - 4);
@@ -703,43 +524,17 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-//        long timeStart = System.currentTimeMillis();
-//        final int[] imageBufferAgo = {0};
-//
-//        imageBuffer.write(chunk, 0, length);
-//
-//        // 更新进度
-//        runOnUiThread(() -> {
-//            int progress = (int) (imageBuffer.size() * 100.0 / expectedImageSize);
-//            long timeStop = System.currentTimeMillis();
-//            int speed = (int) ((imageBuffer.size()- imageBufferAgo[0])/(timeStop - timeStart));
-//            tvProgress.setText("接收进度: " + progress + "%   " + speed + "bps");
-//            imageBufferAgo[0] = imageBuffer.size();
-//        });
-
-
         if (isReceivingAudio) {
-//            long timeStart = System.currentTimeMillis();
-            final int[] imageBufferAgo = {0};
-
             audioBuffer.write(data, 0, length);
-
-            // 更新进度
             runOnUiThread(() -> {
-//                long timeStop = System.currentTimeMillis();
-//                int speed = (int) ((audioBuffer.size()- imageBufferAgo[0])/(timeStop - timeStart));
                 progressAudioReceive.setProgress(audioBuffer.size());
                 tvAudioStatus.setText(String.format(
                         "已接收: %d/%d字节",
                         audioBuffer.size(),
                         expectedAudioSize
                 ));
-
-//                tvAudioStatus.setText(speed+"kbps");
-                imageBufferAgo[0] = audioBuffer.size();
             });
 
-            // 接收完成
             if (audioBuffer.size() >= expectedAudioSize) {
                 receivedAudioData = audioBuffer.toByteArray();
                 runOnUiThread(() -> {
@@ -756,36 +551,30 @@ public class MainActivity extends AppCompatActivity {
         if (receivedAudioData == null) return;
 
         try {
-            // 释放之前的播放器
             if (mediaPlayer != null) {
                 mediaPlayer.release();
             }
 
-            // 创建临时文件（仅内存缓存）
             File tempFile = File.createTempFile("temp_audio", ".mp3", getCacheDir());
             FileOutputStream fos = new FileOutputStream(tempFile);
             fos.write(receivedAudioData);
             fos.close();
 
-            // 初始化播放器
             mediaPlayer = new MediaPlayer();
             mediaPlayer.setDataSource(tempFile.getAbsolutePath());
             mediaPlayer.prepare();
             mediaPlayer.start();
 
-            // 播放完成自动清理
             mediaPlayer.setOnCompletionListener(mp -> {
                 mp.release();
                 tempFile.delete();
                 mediaPlayer = null;
             });
-
         } catch (IOException e) {
             Log.e("Audio", "播放失败", e);
             tvAudioStatus.setText("播放失败: " + e.getMessage());
         }
     }
-
 
     private boolean findUsbDevice() {
         HashMap<String, UsbDevice> deviceList = usbManager.getDeviceList();
@@ -803,17 +592,19 @@ public class MainActivity extends AppCompatActivity {
         usbManager.requestPermission(device, permissionIntent);
     }
 
-    private void showToast(String message){
-        Toast.makeText(this,message,Toast.LENGTH_SHORT).show();
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     protected void onDestroy() {
+        if (sendHandler != null && sendRunnable != null) {
+            sendHandler.removeCallbacks(sendRunnable);
+        }
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
         }
-
         if (imageBuffer != null) {
             try {
                 imageBuffer.close();
@@ -821,7 +612,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.e("Resource", "关闭imageBuffer失败", e);
             }
         }
-
         super.onDestroy();
         try {
             if (serialPort != null) {
