@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -135,14 +136,14 @@ public class MainActivity extends AppCompatActivity {
                 sendRunnable = new Runnable() {
                     @Override
                     public void run() {
-                        sendTextData("1"); // 定时发送 "1"
+                        sendTextData("111111111111111"); // 定时发送 "1"
                         sendCount++;
                         runOnUiThread(() -> {
                             receivedText.append("发送次数: ").append(sendCount).append(LINE_BREAK);
                             tvReceived.setText(receivedText.toString());
                             ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
                         });
-                        sendHandler.postDelayed(this, 100);
+                        sendHandler.postDelayed(this, 500);
                     }
                 };
                 sendHandler.post(sendRunnable);
@@ -378,11 +379,45 @@ public class MainActivity extends AppCompatActivity {
     private double[] speedHistory = new double[5];
     private int speedIndex = 0;
 
+//    private void processReceiveDataText(byte[] receivedBytes) {
+//        try {
+//            long currentTime = System.currentTimeMillis();
+//            int currentByteCount = receivedBytes.length;
+//
+//            if (lastReceiveTime > 0) {
+//                double intervalSec = (currentTime - lastReceiveTime) / 1000.0;
+//                currentSpeed = currentByteCount / intervalSec / 1024;
+//                speedHistory[speedIndex % 5] = currentSpeed;
+//                speedIndex++;
+//                currentSpeed = Arrays.stream(speedHistory).average().orElse(0);
+//            }
+//
+//            lastReceiveTime = currentTime;
+//
+//            String text = new String(receivedBytes, StandardCharsets.UTF_8);
+//            runOnUiThread(() -> {
+//                tvSpeed.setText(formatSpeed(currentSpeed));
+//                receivedText.append(text).append(LINE_BREAK);
+//                tvReceived.setText(receivedText.toString());
+//                ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
+//            });
+//        } catch (Exception e) {
+//            Log.e("USB", "解码失败", e);
+//        }
+//    }
+
+    private static final int MAX_LOG_LENGTH = 10000; // 最大保留字符数
+    private static final int TRIM_THRESHOLD = 8000;  // 达到此长度时开始清理
+//    private final StringBuilder receivedText = new StringBuilder();
+    private int lastTextLength = 0;  // 记录上一次更新TextView时的文本长度
+    private long lastUpdateTime = 0; // 记录上一次更新时间（配合使用）
+
     private void processReceiveDataText(byte[] receivedBytes) {
         try {
             long currentTime = System.currentTimeMillis();
             int currentByteCount = receivedBytes.length;
 
+            // 计算速度的逻辑保持不变
             if (lastReceiveTime > 0) {
                 double intervalSec = (currentTime - lastReceiveTime) / 1000.0;
                 currentSpeed = currentByteCount / intervalSec / 1024;
@@ -390,28 +425,82 @@ public class MainActivity extends AppCompatActivity {
                 speedIndex++;
                 currentSpeed = Arrays.stream(speedHistory).average().orElse(0);
             }
-
             lastReceiveTime = currentTime;
 
             String text = new String(receivedBytes, StandardCharsets.UTF_8);
+
             runOnUiThread(() -> {
+                // 更新速度显示
                 tvSpeed.setText(formatSpeed(currentSpeed));
-                receivedText.append(text).append(LINE_BREAK);
-                tvReceived.setText(receivedText.toString());
-                ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
+
+                // 优化日志处理
+                synchronized (receivedText) {
+                    // 检查并清理过长的日志
+                    if (receivedText.length() > MAX_LOG_LENGTH) {
+                        receivedText.delete(0, receivedText.length() - TRIM_THRESHOLD);
+                        // 确保从完整行开始
+                        int firstNewline = receivedText.indexOf("\n");
+                        if (firstNewline > 0) {
+                            receivedText.delete(0, firstNewline + 1);
+                        }
+                    }
+
+                    // 追加新文本
+                    receivedText.append(text).append(LINE_BREAK);
+
+                    // 仅在有实际变化时更新TextView
+                    if (receivedText.length() - lastTextLength > 100 ||
+                            System.currentTimeMillis() - lastUpdateTime > 500) {
+                        tvReceived.setText(receivedText.toString());
+                        lastTextLength = receivedText.length();
+                        lastUpdateTime = System.currentTimeMillis();
+
+                        // 滚动到底部
+                        ((ScrollView) tvReceived.getParent()).fullScroll(View.FOCUS_DOWN);
+                    }
+                }
             });
         } catch (Exception e) {
             Log.e("USB", "解码失败", e);
         }
     }
 
+//    double sppedMax = 0;
+//    private String formatSpeed(double speedKB) {
+////        if (sppedMax == 0){
+////            sppedMax  = speedKB;
+////        }
+////        sppedMax  = (speedKB+ sppedMax)/2;
+////        speedKB = sppedMax;
+//        if (speedKB < 1) {
+//            return String.format(Locale.getDefault(), "%.2f B/s", speedKB * 1024);
+//        } else if (speedKB < 1024) {
+//            return String.format(Locale.getDefault(), "%.2f KB/s", speedKB);
+//        } else {
+//            return String.format(Locale.getDefault(), "%.2f MB/s", speedKB / 1024);
+//        }
+//    }
+
+    private static final List<Double> speedHistory1 = new ArrayList<>();
+
     private String formatSpeed(double speedKB) {
-        if (speedKB < 1) {
-            return String.format(Locale.getDefault(), "%.2f B/s", speedKB * 1024);
-        } else if (speedKB < 1024) {
-            return String.format(Locale.getDefault(), "%.2f KB/s", speedKB);
+        // 添加当前瞬时值到历史记录
+        speedHistory1.add(speedKB);
+
+        // 计算平均值
+        double sum = 0;
+        for (double speed : speedHistory1) {
+            sum += speed;
+        }
+        double avgSpeedKB = sum / speedHistory1.size();
+
+        // 格式化输出
+        if (avgSpeedKB < 1) {
+            return String.format(Locale.getDefault(), "%.2f B/s (avg)", avgSpeedKB * 1024);
+        } else if (avgSpeedKB < 1024) {
+            return String.format(Locale.getDefault(), "%.2f KB/s (avg)", avgSpeedKB);
         } else {
-            return String.format(Locale.getDefault(), "%.2f MB/s", speedKB / 1024);
+            return String.format(Locale.getDefault(), "%.2f MB/s (avg)", avgSpeedKB / 1024);
         }
     }
 
