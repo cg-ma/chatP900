@@ -196,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadFixedImage() {
         try {
-            InputStream is = getAssets().open("test30kB.jpg");
+            InputStream is = getAssets().open("test202kB.jpg");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] data = new byte[1024];
             int nRead;
@@ -489,23 +489,31 @@ public class MainActivity extends AppCompatActivity {
     private static final List<Double> speedHistory1 = new ArrayList<>();
 
     private String formatSpeed(double speedKB) {
-        // 添加当前瞬时值到历史记录
-        speedHistory1.add(speedKB);
+//        // 添加当前瞬时值到历史记录
+//        speedHistory1.add(speedKB);
+//
+//        // 计算平均值
+//        double sum = 0;
+//        for (double speed : speedHistory1) {
+//            sum += speed;
+//        }
+//        double avgSpeedKB = sum / speedHistory1.size();
+//
+//        // 格式化输出
+//        if (avgSpeedKB < 1) {
+//            return String.format(Locale.getDefault(), "%.2f B/s (avg)", avgSpeedKB * 1024);
+//        } else if (avgSpeedKB < 1024) {
+//            return String.format(Locale.getDefault(), "%.2f KB/s (avg)", avgSpeedKB);
+//        } else {
+//            return String.format(Locale.getDefault(), "%.2f MB/s (avg)", avgSpeedKB / 1024);
+//        }
 
-        // 计算平均值
-        double sum = 0;
-        for (double speed : speedHistory1) {
-            sum += speed;
-        }
-        double avgSpeedKB = sum / speedHistory1.size();
-
-        // 格式化输出
-        if (avgSpeedKB < 1) {
-            return String.format(Locale.getDefault(), "%.2f B/s (avg)", avgSpeedKB * 1024);
-        } else if (avgSpeedKB < 1024) {
-            return String.format(Locale.getDefault(), "%.2f KB/s (avg)", avgSpeedKB);
+        if (speedKB < 1) {
+            return String.format(Locale.getDefault(), "%.2f B/s", speedKB * 1024);
+        } else if (speedKB < 1024) {
+            return String.format(Locale.getDefault(), "%.2f KB/s", speedKB);
         } else {
-            return String.format(Locale.getDefault(), "%.2f MB/s (avg)", avgSpeedKB / 1024);
+            return String.format(Locale.getDefault(), "%.2f MB/s", speedKB / 1024);
         }
     }
 
@@ -552,12 +560,12 @@ public class MainActivity extends AppCompatActivity {
         if (isReceivingImage) {
             imageBuffer.write(chunk, 0, length);
 
-            // 实时更新进度和速率（可选）
+            // 实时更新进度和速率
             runOnUiThread(() -> {
                 int progress = (int) (imageBuffer.size() * 100.0 / expectedImageSize);
                 tvProgress.setText("接收进度: " + progress + "%");
 
-                // 实时计算当前速率（每秒更新）
+                // 实时计算当前速率
                 if (imageReceiveStartTime > 0) {
                     double elapsedSec = (System.currentTimeMillis() - imageReceiveStartTime) / 1000.0;
                     double speedKB = imageBuffer.size() / elapsedSec / 1024;
