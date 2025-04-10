@@ -114,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
         // 加载固定图片到内存
         loadFixedImage();
         // 加载固定音频到内存
-        loadAudioFile();
+//        loadAudioFile();
 
         // USB设备检测
         findUsbDevice();
@@ -231,34 +231,35 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                byte[] sizeInfo = ByteBuffer.allocate(5)
-                        .put(IMAGE_FLAG)
+                byte[] sizeInfo = ByteBuffer.allocate(4)
+//                        .put(IMAGE_FLAG)
                         .putInt(imageData.length)
                         .array();
                 serialPort.write(sizeInfo, 1000);
 
-                int chunkSize = 63;
+                int chunkSize = 512;
                 int totalPackets = (int) Math.ceil((double) imageData.length / chunkSize);
 
                 for (int i = 0; i < totalPackets; i++) {
-                    sleep(3000);
+//                    sleep(3000);
                     int start = i * chunkSize;
                     int end = Math.min(start + chunkSize, imageData.length);
                     byte[] chunk = Arrays.copyOfRange(imageData, start, end);
 
                     if (chunk.length == 0) continue;
 
-                    byte[] packet = new byte[chunk.length + 1];
-                    packet[0] = (i == totalPackets - 1) ? IMAGE_FLAG_END : IMAGE_FLAG;
-                    System.arraycopy(chunk, 0, packet, 1, chunk.length);
-                    serialPort.write(packet, 1000);
+                    serialPort.write(chunk, 1000);
+//                    byte[] packet = new byte[chunk.length + 1];
+//                    packet[0] = (i == totalPackets - 1) ? IMAGE_FLAG_END : IMAGE_FLAG;
+//                    System.arraycopy(chunk, 0, packet, 1, chunk.length);
+//                    serialPort.write(packet, 1000);
 
                     final int progress = (i + 1) * 100 / totalPackets;
                     runOnUiThread(() -> tvProgress.setText("发送进度: " + progress + "%"));
                 }
 
                 runOnUiThread(() -> Toast.makeText(this, "图片发送完成", Toast.LENGTH_SHORT).show());
-            } catch (IOException | InterruptedException e) {
+            } catch (IOException e) {
                 Log.e("USB", "图片发送失败", e);
                 runOnUiThread(() -> tvProgress.setText("发送失败: " + e.getMessage()));
             }
@@ -355,17 +356,21 @@ public class MainActivity extends AppCompatActivity {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     int len = serialPort.read(buffer, 1000);
-                    if (len > 1) {
-                        byte flag = buffer[0];
-                        byte[] data = Arrays.copyOfRange(buffer, 1, len);
-                        if (flag == TEXT_FLAG) {
-                            processReceiveDataText(data);
-                        } else if (flag == IMAGE_FLAG) {
-                            processReceivedDataImage(data, len - 1);
-                        } else {
-                            processReceivedDataAudio(data, len - 1);
-                        }
+                    byte[] data = Arrays.copyOfRange(buffer, 0, len);
+                    if(len > 0){
+                        processReceivedDataImage(data, len);
                     }
+//                    if (len > 1) {
+//                        byte flag = buffer[0];
+//                        byte[] data = Arrays.copyOfRange(buffer, 1, len);
+//                        if (flag == TEXT_FLAG) {
+//                            processReceiveDataText(data);
+//                        } else if (flag == IMAGE_FLAG) {
+//                            processReceivedDataImage(data, len - 1);
+//                        } else {
+//                            processReceivedDataAudio(data, len - 1);
+//                        }
+//                    }
                 } catch (IOException e) {
                     Log.e("USB", "接收中断", e);
                     break;
@@ -504,26 +509,76 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+//    private void processReceivedDataImage(byte[] chunk, int length) {
+//        if (!isReceivingImage && length >= 4) {
+//            expectedImageSize = ByteBuffer.wrap(chunk, 0, 4).getInt();
+//            imageBuffer.write(chunk, 4, length - 4);
+//            isReceivingImage = true;
+//            Log.d("USB", "开始接收图片，预期大小: " + expectedImageSize);
+//            return;
+//        }
+//
+//        if (isReceivingImage) {
+//            imageBuffer.write(chunk, 0, length);
+//            runOnUiThread(() -> {
+//                int progress = (int) (imageBuffer.size() * 100.0 / expectedImageSize);
+//                tvProgress.setText("接收进度: " + progress + "%");
+//            });
+//
+//            if (imageBuffer.size() >= expectedImageSize) {
+//                showReceivedImage(imageBuffer.toByteArray());
+//                imageBuffer.reset();
+//                isReceivingImage = false;
+//            }
+//        }
+//    }
+
+    private long imageReceiveStartTime = 0; // 记录开始时间
+
     private void processReceivedDataImage(byte[] chunk, int length) {
         if (!isReceivingImage && length >= 4) {
             expectedImageSize = ByteBuffer.wrap(chunk, 0, 4).getInt();
             imageBuffer.write(chunk, 4, length - 4);
             isReceivingImage = true;
+            imageReceiveStartTime = System.currentTimeMillis(); // 记录开始时间
             Log.d("USB", "开始接收图片，预期大小: " + expectedImageSize);
+            runOnUiThread(() -> {
+                tvProgress.setText("开始接收图片...");
+                tvSpeed.setText("速率: 计算中...");
+            });
             return;
         }
 
         if (isReceivingImage) {
             imageBuffer.write(chunk, 0, length);
+
+            // 实时更新进度和速率（可选）
             runOnUiThread(() -> {
                 int progress = (int) (imageBuffer.size() * 100.0 / expectedImageSize);
                 tvProgress.setText("接收进度: " + progress + "%");
+
+                // 实时计算当前速率（每秒更新）
+                if (imageReceiveStartTime > 0) {
+                    double elapsedSec = (System.currentTimeMillis() - imageReceiveStartTime) / 1000.0;
+                    double speedKB = imageBuffer.size() / elapsedSec / 1024;
+                    tvSpeed.setText("实时速率: " + formatSpeed(speedKB));
+                }
             });
 
             if (imageBuffer.size() >= expectedImageSize) {
+                long endTime = System.currentTimeMillis();
+                double totalTimeSec = (endTime - imageReceiveStartTime) / 1000.0;
+                double totalSpeedKB = expectedImageSize / totalTimeSec / 1024;
+
+                runOnUiThread(() -> {
+                    tvSpeed.setText("平均速率: " + formatSpeed(totalSpeedKB));
+                    tvProgress.setText("接收完成，耗时: " + String.format("%.2f秒", totalTimeSec));
+                });
+
                 showReceivedImage(imageBuffer.toByteArray());
                 imageBuffer.reset();
                 isReceivingImage = false;
+                imageReceiveStartTime = 0; // 重置计时
             }
         }
     }
