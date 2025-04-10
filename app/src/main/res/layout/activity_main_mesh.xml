@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_received"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="接收区"
+        android:textSize="18sp" />
+    <!-- 目标地址输入框 -->
+    <EditText
+        android:id="@+id/et_target_addr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="输入目标地址"
+        android:inputType="text"/>
+
+    <!-- 消息输入框 -->
+    <EditText
+        android:id="@+id/et_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="输入消息"
+        android:inputType="textMultiLine"
+        android:minLines="3"/>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btn_send_unicast"
+            android:layout_width="126dp"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:text="发送单播" />
+
+        <Button
+            android:id="@+id/btn_send_broadcast"
+            android:layout_width="126dp"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:text="发送广播" />
+    </RelativeLayout>
+
+
+    <TextView
+        android:id="@+id/tv_device_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textSize="18sp"
+        android:text="设备信息" />
+
+</LinearLayout>
