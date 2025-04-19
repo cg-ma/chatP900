@@ -207,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadFixedImage() {
         try {
-            InputStream is = getAssets().open("test3kB.jpg");
+            InputStream is = getAssets().open("b.png ");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] data = new byte[1024];
             int nRead;
